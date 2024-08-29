@@ -1,0 +1,85 @@
+#include <Wire.h>                 // Include Wire library for I2C
+#include <Adafruit_GFX.h>         // Include Adafruit graphics library
+#include <Adafruit_SSD1306.h>     // Include Adafruit SSD1306 OLED display library
+#include <SoftwareSerial.h>       // Include SoftwareSerial library for ESP8266 communication
+
+// Define screen dimensions for OLED
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+// Create an SSD1306 display object connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Define SoftwareSerial pins for ESP8266 communication
+SoftwareSerial espSerial(2, 3); // RX, TX
+
+// WiFi credentials
+const char* ssid = "your_SSID";       // Replace with your WiFi network name
+const char* password = "your_PASSWORD"; // Replace with your WiFi password
+
+void setup() {
+  // Initialize Serial for debugging and communication with ESP8266
+  Serial.begin(115200);
+  espSerial.begin(115200); // Start ESP8266 communication
+
+  // Initialize OLED display with I2C address 0x3C (common for 128x64 OLEDs)
+  if (!display.begin(SSD1306_I2C_ADDRESS, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;); // Don't proceed, loop forever
+  }
+  
+  // Clear the display buffer
+  display.clearDisplay();
+  display.setTextSize(1); // Set text size
+  display.setTextColor(SSD1306_WHITE); // Set text color
+
+  // Display initial message
+  display.setCursor(0, 0);
+  display.println("Connecting to WiFi...");
+  display.display();
+  
+  // Connect to WiFi using ESP8266 AT commands
+  connectToWiFi();
+}
+
+void loop() {
+  // Main loop does nothing in this example
+}
+
+void connectToWiFi() {
+  // Reset the ESP8266
+  espSerial.println("AT+RST");
+  delay(2000);
+
+  // Set ESP8266 to station mode
+  espSerial.println("AT+CWMODE=1");
+  delay(2000);
+
+  // Connect to the WiFi network
+  espSerial.print("AT+CWJAP=\"");
+  espSerial.print(ssid);
+  espSerial.print("\",\"");
+  espSerial.print(password);
+  espSerial.println("\"");
+  
+  delay(10000); // Wait for connection
+
+  // Check if the connection was successful
+  espSerial.println("AT+CIFSR");
+  delay(2000);
+
+  // Read and display the response from ESP8266
+  while (espSerial.available()) {
+    String line = espSerial.readStringUntil('\n');
+    if (line.indexOf("STAIP") != -1) {
+      // Extract the IP address and display it
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.println("WiFi Connected!");
+      display.println("IP Address:");
+      display.println(line.substring(line.indexOf('"') + 1, line.lastIndexOf('"')));
+      display.display();
+      Serial.println(line); // Print to Serial Monitor
+    }
+  }
+}
